@@ -1,0 +1,193 @@
+import os
+import numpy as np
+import pandas as pd
+import cv2
+
+def test_videowriter(output_path, fps, width, height):
+    """Test if VideoWriter works with a minimal example."""
+    try:
+        fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        if not out.isOpened():
+            print("Test VideoWriter failed: Cannot initialize")
+            return False
+        frame = np.zeros((height, width, 3), dtype=np.uint8)
+        for _ in range(5):
+            out.write(frame)
+        out.release()
+        if os.path.exists(output_path):
+            print(f"Test VideoWriter succeeded: {output_path} created")
+            os.remove(output_path)
+            return True
+        else:
+            print("Test VideoWriter failed: Output file not created")
+            return False
+    except Exception as e:
+        print(f"Test VideoWriter failed: {e}")
+        return False
+
+def display_results(world_camera, reference_image, out_name, out_dir):
+    print("OpenCV version:", cv2.__version__)
+
+    # Use absolute paths
+    world_camera = os.path.abspath(world_camera)
+    reference_image = os.path.abspath(reference_image)
+    output_path = os.path.abspath(os.path.join(out_dir, 'video_rim.mp4'))
+    out_data = os.path.abspath(os.path.join(out_dir, f'mappedGaze_{out_name}.csv'))
+
+    # Verify input files
+    for path, name in [(world_camera, 'video'), (reference_image, 'reference image'), (out_data, 'CSV')]:
+        if not os.path.exists(path):
+            print(f"Error: {name} file {path} does not exist")
+            exit()
+
+    # Create output directory and verify write permissions
+    os.makedirs(out_dir, exist_ok=True)
+    test_file = os.path.join(out_dir, 'test.txt')
+    try:
+        with open(test_file, 'w') as f:
+            f.write('Test')
+        os.remove(test_file)
+        print(f"Output directory is writable: {out_dir}")
+    except Exception as e:
+        print(f"Error: Cannot write to {out_dir}: {e}")
+        exit()
+
+    # Test VideoWriter
+    if not test_videowriter(os.path.join(out_dir, 'test.mp4'), 30, 1200, 450):
+        print("Error: VideoWriter test failed. Check FFMpeg and codec support.")
+        exit()
+
+    # Load DataFrame with optimization
+    try:
+        df_results = pd.read_csv(out_data, usecols=['worldFrame', 'ref_gazeX', 'ref_gazeY', 'world_gazeX', 'world_gazeY'],
+                                 dtype={'worldFrame': 'int32', 'ref_gazeX': 'float32', 'ref_gazeY': 'float32',
+                                        'world_gazeX': 'float32', 'world_gazeY': 'float32'})
+        df_results.set_index('worldFrame', inplace=True)
+        print(f"DataFrame loaded, frame range: {df_results.index.min()} to {df_results.index.max()}")
+        print(f"NaN counts:\n{df_results[['ref_gazeX', 'ref_gazeY', 'world_gazeX', 'world_gazeY']].isna().sum()}")
+        if df_results.empty:
+            print("Error: DataFrame is empty")
+            exit()
+    except Exception as e:
+        print(f"Error loading CSV: {e}")
+        exit()
+
+    # Original resolution
+    down_width, down_height = 600, 450
+
+    # Open input video
+    try:
+        cap = cv2.VideoCapture(world_camera)
+        if not cap.isOpened():
+            print(f"Error: Cannot open video {world_camera}")
+            exit()
+    except Exception as e:
+        print(f"Error opening video: {e}")
+        exit()
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    print(f"Video properties: {int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))}x{int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))}, FPS: {fps}, Frames: {frame_count}")
+
+    # Verify video dimensions
+    if frame_count == 0 or cap.get(cv2.CAP_PROP_FRAME_WIDTH) == 0:
+        print("Error: Invalid video dimensions or empty video")
+        cap.release()
+        exit()
+
+    # Test reading one frame
+    try:
+        ret, frame = cap.read()
+        if not ret:
+            print("Error: Cannot read first frame from video")
+            cap.release()
+            exit()
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # Reset to start
+        del frame
+    except Exception as e:
+        print(f"Error testing video read: {e}")
+        cap.release()
+        exit()
+
+    # Load and process reference image
+    try:
+        ref_frame = cv2.imread(reference_image, cv2.IMREAD_COLOR)
+        if ref_frame is None:
+            print(f"Error: Cannot read reference image {reference_image}")
+            cap.release()
+            exit()
+        ref_frame_resized = cv2.resize(ref_frame, (down_width, down_height), interpolation=cv2.INTER_LINEAR)
+        ref_frame_bgr = ref_frame_resized  # Keep in BGR to avoid extra conversion
+        del ref_frame, ref_frame_resized
+    except Exception as e:
+        print(f"Error processing reference image: {e}")
+        cap.release()
+        exit()
+
+    # Initialize VideoWriter with MJPG codec
+    fourcc = cv2.VideoWriter_fourcc(*'MJPG')  # Try 'XVID', 'mp4v', or 'H264' if MJPG fails
+    out = cv2.VideoWriter(output_path, fourcc, fps, (down_width * 2, down_height))
+    if not out.isOpened():
+        print("Error: Cannot initialize VideoWriter. Check FFMpeg installation and codec support.")
+        cap.release()
+        exit()
+
+    # Process frames in streaming mode
+    frame_number = 0
+    max_frames = min(frame_count, df_results.index.max() + 1)
+    print(f"Processing {max_frames} frames")
+    try:
+        while frame_number < max_frames:
+            ret, frame = cap.read()
+            if not ret:
+                print(f"End of video at frame {frame_number}")
+                break
+
+            # Resize and keep in BGR to minimize conversions
+            frame_resized = cv2.resize(frame, (down_width, down_height), interpolation=cv2.INTER_LINEAR)
+
+            # Extract gaze coordinates
+            local_result_df = df_results.loc[frame_number] if frame_number in df_results.index else pd.DataFrame()
+            x_left = np.mean(local_result_df['world_gazeX'].values) if not local_result_df.empty else np.nan
+            y_left = np.mean(local_result_df['world_gazeY'].values) if not local_result_df.empty else np.nan
+            x_right = np.mean(local_result_df['ref_gazeX'].values) + down_width if not local_result_df.empty else np.nan
+            y_right = np.mean(local_result_df['ref_gazeY'].values) if not local_result_df.empty else np.nan
+
+            # Combine frames and draw points
+            frame_combined = np.hstack((frame_resized, ref_frame_bgr))
+            if not np.isnan(x_left) and not np.isnan(y_left):
+                cv2.circle(frame_combined, (int(x_left), int(y_left)), 5, (0, 0, 255), -1)  # Red, radius 5
+            if not np.isnan(x_right) and not np.isnan(y_right):
+                cv2.circle(frame_combined, (int(x_right), int(y_right)), 5, (255, 0, 0), -1)  # Blue, radius 5
+
+            # Write frame
+            out.write(frame_combined)
+            frame_number += 1
+            print(f'Frame: {frame_number}')
+
+            # Free memory immediately
+            del frame, frame_resized, frame_combined
+    except Exception as e:
+        print(f"Error during frame processing: {e}")
+        cap.release()
+        out.release()
+        exit()
+
+    cap.release()
+    out.release()
+
+    # Verify output file
+    if os.path.exists(output_path):
+        print(f"Video saved at {output_path}, size: {os.path.getsize(output_path)} bytes")
+    else:
+        print("Error: Output file was not created")
+
+# Call the function
+try:
+    display_results('RIM_test/test/world_video.mp4',
+                    'RIM_test/test/image_ref.jpg',
+                    '2023-11-06_07-27-43_gaze',
+                    'RIM_test/test')
+except Exception as e:
+    print(f"Error executing display_results: {e}")

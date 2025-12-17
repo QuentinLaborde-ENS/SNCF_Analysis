@@ -1,0 +1,95 @@
+
+data: 
+ 
+  
+    oculomotor_features: [
+'startTime(s)', 'fixDur', 'fixVel', 'fixDriftDisplacement', 'fixDriftDist', 'fixDriftVel', 'fixBCEA', #'  
+'sacFreq', 'sacAmp',   'sacEfficiency',  
+'sacPeakVel' , 'sacPeakAcc', #'sacSkewnessExponent', 
+'sacPeakVelAmpRatio'   
+              ]
+     
+    scanpath_features: [
+'startTime(s)', 'SpLength', 'SpBCEA' , 'SpConvexHull', 'SpFractalDimension', #'SpVoronoi', 'SpKCoefficient', 
+'SpRQARecRate', 'SpRQADet', 'SpRQALam', 
+              ]
+              
+    aoi_features: [
+'startTime(s)', 'AoINumber',  
+'AoIBCEA', 'AoIBCEADisp', 
+'AoILempelZiv',  
+#'AoIStationaryEntropy', 'AoIJointEntropy',
+#'AoIConditionalEntropy' ,  'AoIMutualInformation' #
+              ]
+              
+    eda_features: [
+'startTime(s)', 'edaKurtosis', 
+'edaSkewness', 'edaMean',
+'edaRMSms', 'edaIntegral', 'edaPotency',
+'edaActivity', 'edaMobility', 'edaComplexity'    
+    ]
+
+    ecg_features: [
+'startTime(s)', 'ecgSDNN', 'ecgRMSSD', 'ecgTriindex'
+    ]
+    
+
+general: 
+
+    segmentation_method: I_HMM
+    
+    oculomotor_partition_length: 20
+    scanpath_partition_length: 20
+    aoi_partition_length: 20 
+    eda_partition_length: 20
+    ecg_partition_length: 20
+    
+   
+    size_plan_x: !!float 1600
+    size_plan_y: !!float 1200
+    
+symbolization: 
+    normalization: all
+    normalization_method: empirical
+    binning: True
+          
+    nb_clusters:
+        oculomotor: 20 #25
+        scanpath: 20
+        aoi: 20
+        ecg: 20
+        eda: 20
+       
+clustering: 
+    edit_distance:
+        deletion_cost: !!float 1
+        insertion_cost: !!float 1
+        normalization: max
+   
+  
+ 
+    
+    
+    
+    
+   
+    
+    
+    
+    
+    
+    
+   
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
