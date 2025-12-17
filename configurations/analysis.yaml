@@ -18,7 +18,7 @@ data:
 'startTime(s)', 'AoINumber',  
 'AoIBCEA', 'AoIBCEADisp', 
 'AoILempelZiv',  
-#'AoIStationaryEntropy', 'AoIJointEntropy',
+'AoIStationaryEntropy', 'AoIJointEntropy',
 #'AoIConditionalEntropy' ,  'AoIMutualInformation' #
               ]
               
@@ -38,9 +38,9 @@ general:
 
     segmentation_method: I_HMM
     
-    oculomotor_partition_length: 20
-    scanpath_partition_length: 20
-    aoi_partition_length: 20 
+    oculomotor_partition_length: 10
+    scanpath_partition_length: 30
+    aoi_partition_length: 60 
     eda_partition_length: 20
     ecg_partition_length: 20
     
