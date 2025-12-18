@@ -6,8 +6,11 @@ import glob
 import numpy as np 
 import copy 
 import pandas as pd
+import matplotlib.pyplot as plt 
 
 import vision_toolkit as v
+from processing_analysis.ecg_algorithms import Pan_Tompkins_QRS, HeartRate
+import neurokit2 as nk
 
 
 def process(gaze, mapped_gaze, ref_image, 
@@ -17,9 +20,15 @@ def process(gaze, mapped_gaze, ref_image,
     
     process_oculomotor=False 
     process_scanpath=False
-    process_aoi=True 
+    process_aoi=False 
     process_eda=False
-    process_ecg=False
+    process_ecg=True
+    
+    if process_ecg:
+        process_ecg_features_(ecg, config, record)
+        
+    if process_eda:
+        process_eda_features_(eda, config, record)
     
     if (process_oculomotor or process_scanpath or process_aoi):
         segmentation = v.BinarySegmentation(gaze, 
@@ -42,7 +51,80 @@ def process(gaze, mapped_gaze, ref_image,
             
     print('...done \n')
  
+
+def process_ecg_features_(ecg, config, record, display=False):
+    print(ecg)
+    n_s = len(ecg)
+    seq = ecg['ecg_lead_2']
+    seq = np.asarray(seq, dtype=float)
+  
+    s_f = config['sampling_frequencies']['equivital']
+    part_length = config['general']['ecg_partition_length']
+    part_length = int(np.ceil(part_length * s_f)) 
     
+    nb_segments = n_s // part_length
+    features = config['data']['ecg_features']
+    result_df = pd.DataFrame(columns=features)
+    
+    for n_ in range(nb_segments): 
+        
+        start = n_ * part_length
+        end = start + part_length
+        seq_ = seq[start:end]         
+    
+        QRS_detector = Pan_Tompkins_QRS()
+        bpass, _, _, mwin = QRS_detector.solve(seq_, s_f)
+        hr = HeartRate(seq_, s_f, mwin, bpass)
+        result = hr.find_r_peaks()    
+    
+        if display:
+             
+            t = np.arange(start, end) / s_f        
+            r_peaks_global_t = (start + result) / s_f
+    
+            plt.figure(figsize=(20, 6), dpi=100)
+            plt.plot(t, seq_, color='darkblue', linewidth=2)
+            plt.scatter(r_peaks_global_t, seq_[result], color='red', s=120, marker='o')
+     
+            segment_t_min = t[0]
+            segment_t_max = t[-1]
+            step = 1.0  # 1 seconde
+            xticks = np.arange(
+                np.floor(segment_t_min),
+                np.ceil(segment_t_max) + 1e-9,
+                step
+            )
+            plt.xticks(xticks)
+    
+            plt.xlabel("Time (s)")
+            plt.ylabel("Amplitude (mV)")
+            plt.tight_layout()
+            plt.show()
+            plt.clf()
+            
+        nni = np.diff(result) * 1000 / s_f   
+        nni = nni[(nni >= 250) & (nni <= 2500)]
+        
+        hr_inst = 60000.0 / nni
+        hr = np.median(hr_inst)
+        print(hr)
+            
+    return 0
+
+def process_eda_features_(eda, config, record):
+    
+    n_s = len(eda)
+    s_f = config['sampling_frequencies']['empatica']
+    part_length = config['general']['eda_partition_length']
+    part_length = int(np.ceil(part_length * s_f)) 
+    
+    nb_segments = n_s // part_length
+    features = config['data']['eda_features']
+    result_df = pd.DataFrame(columns=features)
+    
+    return 0
+
+
 def process_oculomotor_features_(segmentation, config, record):
   
     n_s = segmentation.config['nb_samples']
@@ -239,9 +321,9 @@ def process_aoi_features_(segmentation, mapped_gaze,
                                   AoI_IMS_bandwidth = 150,
                                   size_plan_x_gaze = size_plan_x_gaze,
                                   size_plan_y_gaze = size_plan_y_gaze,
-                                  display_AoI_identification=True,  
+                                  display_AoI_identification=False,  
                                   verbose=False)
-            assert aoi.nb_aoi > 1
+            #assert aoi.nb_aoi > 1
             aoi_f = aoi_features(aoi) 
             line = [start/s_f] + aoi_f 
             result_df.loc[len(result_df), :] = line
@@ -333,6 +415,17 @@ if __name__ == '__main__':
     with open('configurations/analysis.yaml', 'r') as file:
         config = yaml.safe_load(file)
         
+        
+    # with open('sanity_check/eda_sanity_check/output/sanity.pkl', 'rb') as handle:
+    #     pkl_gaze = pickle.load(handle) 
+        
+    # print(pkl_gaze['2023-11-28_12-33-50']['df'])
+    # for k_ in pkl_gaze.keys():
+    #     l_pkl = pkl_gaze[k_]
+    #     plt.plot(l_pkl['df']['eda_scr'])
+    #     plt.show()
+    #     plt.clf()
+    
     for pkl in pkl_files:
       if pkl =='parsed_data/2024-04-23_10-46-11.pkl':
         with open(pkl, 'rb') as handle:

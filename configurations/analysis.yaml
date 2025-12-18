@@ -30,7 +30,7 @@ data:
     ]
 
     ecg_features: [
-'startTime(s)', 'ecgSDNN', 'ecgRMSSD', 'ecgTriindex'
+'startTime(s)', 'ecgFrequency', 'ecgSDNN', 'ecgRMSSD', 'ecgTriindex'
     ]
     
 
@@ -38,8 +38,8 @@ general:
 
     segmentation_method: I_HMM
     
-    oculomotor_partition_length: 10
-    scanpath_partition_length: 30
+    oculomotor_partition_length: 15
+    scanpath_partition_length: 45
     aoi_partition_length: 60 
     eda_partition_length: 20
     ecg_partition_length: 20
