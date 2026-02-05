@@ -48,9 +48,10 @@ general:
     size_plan_x: !!float 1600
     size_plan_y: !!float 1200
     
+    available_segment_prop: .8
+    
 symbolization: 
-    normalization: all
-    normalization_method: empirical
+    
     binning: True
           
     nb_clusters:

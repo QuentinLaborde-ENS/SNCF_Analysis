@@ -1,16 +1,18 @@
 # -*- coding: utf-8 -*-
-import yaml
-import pickle 
-import os 
-import glob
+
 import numpy as np 
 import copy 
 import pandas as pd
 import matplotlib.pyplot as plt 
 
+import pyhrv
+import neurokit2 as nk
+import antropy as ant
+from scipy.stats import skew, kurtosis
+
 import vision_toolkit as v
 from processing_analysis.ecg_algorithms import Pan_Tompkins_QRS, HeartRate
-import neurokit2 as nk
+
 
 
 def process(gaze, mapped_gaze, ref_image, 
@@ -22,12 +24,12 @@ def process(gaze, mapped_gaze, ref_image,
     process_scanpath=False
     process_aoi=False 
     process_eda=False
-    process_ecg=True
+    process_ecg=False
     
     if process_ecg:
         process_ecg_features_(ecg, config, record)
         
-    if process_eda:
+    if process_eda:  
         process_eda_features_(eda, config, record)
     
     if (process_oculomotor or process_scanpath or process_aoi):
@@ -50,8 +52,74 @@ def process(gaze, mapped_gaze, ref_image,
                                        config, ref_image, record)
             
     print('...done \n')
+  
+    
+def process_eda_features_(eda, config, record, display=False):
+    
+    n_s = len(eda)
+    s_f = config['sampling_frequencies']['empatica']
+    part_length = config['general']['eda_partition_length']
+    part_length = int(np.ceil(part_length * s_f)) 
+    
+    nb_segments = n_s // part_length
+    features = config['data']['eda_features']
+    result_df = pd.DataFrame(columns=features)
+    
+    signal = eda['eda'].to_numpy()
+    
+    signals, info = nk.eda_process(signal, sampling_rate=s_f)
+    seq = signals['EDA_Phasic'].to_numpy()
+    
+    for n_ in range(nb_segments): 
+        start = n_ * part_length
+        end = start + part_length
+        seq_ = seq[start:end]  
+        
+        eda_features = []
+        
+        ## Statistical domain
+        eda_features.append(kurtosis(seq_))
+        eda_features.append(skew(seq_))
+        eda_features.append(np.mean(seq_))
+        
+        ## Morphological domain
+        rms_ = np.mean(seq_**2)
+        rms_ = np.sqrt(rms_)
+        eda_features.append(rms_)
+        
+        integral_ = np.trapz(np.abs(seq_), dx=1/s_f)
+        eda_features.append(integral_)
+        
+        potency_ = seq_**2 
+        potency_ = np.mean(potency_)
+        eda_features.append(potency_)
+        
+        ## Hjorth domain 
+        mu_ = np.mean(seq_)
+        activity_ = np.mean((seq_-mu_)**2)
+        eda_features.append(activity_)
+        
+        mobility_, complexity_ = ant.hjorth_params(seq_)
+        eda_features.append((mobility_))
+        eda_features.append(complexity_)
+        
+        if display:   
+            plt.figure(figsize=(20, 6), dpi=100)
+            t = np.arange(start, end) / s_f    
+            plt.plot(t, seq_, color='darkblue', linewidth=2)
+            plt.show()
+            plt.clf()
+            
+        line = [start/s_f] + eda_features 
+        result_df.loc[len(result_df), :] = line
+            
+    filename='output/features/{r_}_eda.csv'.format(r_=record)
+    result_df.to_csv(filename, index=False)    
+    
  
 
+
+    
 def process_ecg_features_(ecg, config, record, display=False):
    
     n_s = len(ecg)
@@ -67,60 +135,71 @@ def process_ecg_features_(ecg, config, record, display=False):
     result_df = pd.DataFrame(columns=features)
     
     for n_ in range(nb_segments): 
+        try:
+            start = n_ * part_length
+            end = start + part_length
+            seq_ = seq[start:end]         
         
-        start = n_ * part_length
-        end = start + part_length
-        seq_ = seq[start:end]         
-    
-        QRS_detector = Pan_Tompkins_QRS()
-        bpass, _, _, mwin = QRS_detector.solve(seq_, s_f)
-        hr = HeartRate(seq_, s_f, mwin, bpass)
-        result = hr.find_r_peaks()    
-    
-        if display: 
-            t = np.arange(start, end) / s_f        
-            r_peaks_global_t = (start + result) / s_f
-    
-            plt.figure(figsize=(20, 6), dpi=100)
-            plt.plot(t, seq_, color='darkblue', linewidth=2)
-            plt.scatter(r_peaks_global_t, seq_[result], color='red', s=120, marker='o')
-     
-            segment_t_min = t[0]
-            segment_t_max = t[-1]
-            step = 1.0  # 1 seconde
-            xticks = np.arange(
-                np.floor(segment_t_min),
-                np.ceil(segment_t_max) + 1e-9,
-                step
-            )
-            plt.xticks(xticks) 
-            plt.xlabel("Time (s)")
-            plt.ylabel("Amplitude (mV)")
-            plt.tight_layout()
-            plt.show()
-            plt.clf()
+            QRS_detector = Pan_Tompkins_QRS()
+            bpass, _, _, mwin = QRS_detector.solve(seq_, s_f)
+            hr = HeartRate(seq_, s_f, mwin, bpass)
+            result = hr.find_r_peaks()    
+        
+            if display: 
+                t = np.arange(start, end) / s_f        
+                r_peaks_global_t = (start + result) / s_f
+        
+                plt.figure(figsize=(20, 6), dpi=100)
+                plt.plot(t, seq_, color='darkblue', linewidth=2)
+                plt.scatter(r_peaks_global_t, seq_[result], color='red', s=120, marker='o')
+         
+                segment_t_min = t[0]
+                segment_t_max = t[-1]
+                step = 1.0  # 1 seconde
+                xticks = np.arange(
+                    np.floor(segment_t_min),
+                    np.ceil(segment_t_max) + 1e-9,
+                    step
+                )
+                plt.xticks(xticks) 
+                plt.xlabel("Time (s)")
+                plt.ylabel("Amplitude (mV)")
+                plt.tight_layout()
+                plt.show()
+                plt.clf()
+             
+            ecg_features = []
             
-        nni = np.diff(result) * 1000 / s_f   
-        nni = nni[(nni >= 250) & (nni <= 2500)]
-        
-        hr_inst = 60000.0 / nni
-        hr = np.median(hr_inst)
-        
+            nni = np.diff(result) * 1000 / s_f   
+            nni = nni[(nni >= 250) & (nni <= 2500)]
             
-    return 0
+            hr_inst = 60000.0 / nni
+            hr = np.median(hr_inst)
+            ecg_features.append(hr)
+            
+            sdnn = np.float32(pyhrv.time_domain.sdnn(nni)['sdnn'])
+            ecg_features.append(sdnn)
+            
+            rmssd = np.float32(pyhrv.time_domain.rmssd(nni)['rmssd'])
+            ecg_features.append(rmssd)
+             
+            tri_index = np.float32(pyhrv.time_domain.triangular_index(nni, plot=False)['tri_index'])
+            ecg_features.append(tri_index)  
+            
+            line = [start/s_f] + ecg_features 
+            result_df.loc[len(result_df), :] = line
+            
+        except: 
+            print('Segment: {n_} rejected'.format(n_=n))
+            line = [start/s_f] + [np.nan] * (len(features)-1) 
+            result_df.loc[len(result_df), :] = line
+            pass 
+            
+    filename='output/features/{r_}_ecg.csv'.format(r_=record)
+    result_df.to_csv(filename, index=False)   
 
-def process_eda_features_(eda, config, record):
-    
-    n_s = len(eda)
-    s_f = config['sampling_frequencies']['empatica']
-    part_length = config['general']['eda_partition_length']
-    part_length = int(np.ceil(part_length * s_f)) 
-    
-    nb_segments = n_s // part_length
-    features = config['data']['eda_features']
-    result_df = pd.DataFrame(columns=features)
-    
-    return 0
+
+
 
 
 def process_oculomotor_features_(segmentation, config, record):
@@ -416,51 +495,7 @@ def update_segmentation_results(segmentation_results,
  
 
 
-if __name__ == '__main__':
-    
-    pkl_files = glob.glob("parsed_data/*.pkl")
-   
-    with open('configurations/analysis.yaml', 'r') as file:
-        config = yaml.safe_load(file)
-        
-        
-    # with open('sanity_check/eda_sanity_check/output/sanity.pkl', 'rb') as handle:
-    #     pkl_gaze = pickle.load(handle) 
-        
-    # print(pkl_gaze['2023-11-28_12-33-50']['df'])
-    # for k_ in pkl_gaze.keys():
-    #     l_pkl = pkl_gaze[k_]
-    #     plt.plot(l_pkl['df']['eda_scr'])
-    #     plt.show()
-    #     plt.clf()
-    
-    # dict_line = dict()
-    # dict_agent = dict()
-    for pkl in pkl_files:
-      if pkl =='parsed_data/2024-04-23_10-46-11.pkl':
-        with open(pkl, 'rb') as handle:
-            df = pickle.load(handle) 
-   
-        config.update({'sampling_frequencies': df['info']['sampling_frequencies']})
-        record = pkl.split('/')[1].split('.')[0]
-    
-        # line = df['info']['line']
-        # driver = df['info']['driver']
-   
-        process(df['gaze'], df['mapped_gaze'], df['reference_image'],
-                df['ecg'], df['eda'], config, record)
-        print(record)
-    #     dict_line.update({record: line})
-    #     dict_agent.update({record: driver})
-        
-    # with open("output/info/line.pkl", "wb") as f:
-    #     pickle.dump(dict_line, f) 
-    # with open("output/info/driver.pkl", "wb") as f:
-    #     pickle.dump(dict_agent, f)
  
-        
-        
-        
         
         
         
