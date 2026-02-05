@@ -146,10 +146,6 @@ def signal_segmentation(signal,
     return my_bkps
     
  
-from matplotlib.ticker import FuncFormatter
-import matplotlib.pyplot as plt
-import numpy as np
-
 
 def display_segmentation(signal, my_bkps, partition_length, name=None):
     

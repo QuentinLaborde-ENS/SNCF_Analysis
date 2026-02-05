@@ -8,8 +8,9 @@ import glob
 from processing_analysis.feature_extraction import process as fe_process
 from processing_analysis.feature_normalization import process as fn_process
 from processing_analysis.segmentation import process as se_process
-
-
+from processing_analysis.symbolization import process as sy_process
+from processing_analysis.symbolization_metrics import process as sm_process
+from processing_analysis.symbolization_metrics import plot_dist_mat
 
 def feature_extraction():
  
@@ -58,6 +59,17 @@ def symbolization():
     
     with open('configurations/analysis.yaml', 'r') as file:
         config = yaml.safe_load(file)
+        
+    path = 'output/normalized_features/'
+    feature_records = [f for f in os.listdir(path) if f[-4:] == '.csv']
+
+    sy_process(config, path, feature_records)
+    
+    
+def symbolization_metrics():
+    
+    #sm_process()
+    plot_dist_mat()
     
 
 
@@ -71,11 +83,14 @@ if __name__ == '__main__':
     if False:
         feature_normalization()
 
-    if True:
+    if False:
         segmentation()
         
     if False:
         symbolization()
+        
+    if True:
+        symbolization_metrics()
         
         
         
