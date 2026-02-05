@@ -53,7 +53,7 @@ def process(gaze, mapped_gaze, ref_image,
  
 
 def process_ecg_features_(ecg, config, record, display=False):
-    print(ecg)
+   
     n_s = len(ecg)
     seq = ecg['ecg_lead_2']
     seq = np.asarray(seq, dtype=float)
@@ -77,8 +77,7 @@ def process_ecg_features_(ecg, config, record, display=False):
         hr = HeartRate(seq_, s_f, mwin, bpass)
         result = hr.find_r_peaks()    
     
-        if display:
-             
+        if display: 
             t = np.arange(start, end) / s_f        
             r_peaks_global_t = (start + result) / s_f
     
@@ -94,8 +93,7 @@ def process_ecg_features_(ecg, config, record, display=False):
                 np.ceil(segment_t_max) + 1e-9,
                 step
             )
-            plt.xticks(xticks)
-    
+            plt.xticks(xticks) 
             plt.xlabel("Time (s)")
             plt.ylabel("Amplitude (mV)")
             plt.tight_layout()
@@ -107,7 +105,7 @@ def process_ecg_features_(ecg, config, record, display=False):
         
         hr_inst = 60000.0 / nni
         hr = np.median(hr_inst)
-        print(hr)
+        
             
     return 0
 
@@ -199,7 +197,8 @@ def saccade_features(segmentation):
     return sac_features
     
 def process_scanpath_features_(segmentation, mapped_gaze, 
-                               config, ref_im, record):
+                               config, ref_im, record,
+                               mapping_threshold = 0.5):
   
     n_s = segmentation.config['nb_samples']
     s_f = config['sampling_frequencies']['pupil_labs']
@@ -230,6 +229,10 @@ def process_scanpath_features_(segmentation, mapped_gaze,
             l_segmentation.new_config(update_config(segmentation.config, 
                                                     start, end)) 
             l_mapped_gaze = mapped_gaze.iloc[start: end].copy()
+            status_ = l_mapped_gaze['status']
+            prop_ = np.sum(status_)/len(status_)
+            assert prop_ >= mapping_threshold
+            
             scanpath = v.Scanpath(l_segmentation,
                                   gaze_df = l_mapped_gaze,
                                   ref_image = ref_im,
@@ -283,7 +286,8 @@ def scanpath_features(scanpath):
     return scan_features
         
 def process_aoi_features_(segmentation, mapped_gaze, 
-                          config, ref_im, record):
+                          config, ref_im, record,
+                          mapping_threshold=0.5):
   
     n_s = segmentation.config['nb_samples']
     s_f = config['sampling_frequencies']['pupil_labs']
@@ -314,6 +318,10 @@ def process_aoi_features_(segmentation, mapped_gaze,
             l_segmentation.new_config(update_config(segmentation.config, 
                                                     start, end)) 
             l_mapped_gaze = mapped_gaze.iloc[start: end].copy()
+            status_ = l_mapped_gaze['status']
+            prop_ = np.sum(status_)/len(status_)
+            assert prop_ >= mapping_threshold
+            
             aoi = v.AoISequence(l_segmentation,
                                   gaze_df = l_mapped_gaze,
                                   ref_image = ref_im,
@@ -426,6 +434,8 @@ if __name__ == '__main__':
     #     plt.show()
     #     plt.clf()
     
+    # dict_line = dict()
+    # dict_agent = dict()
     for pkl in pkl_files:
       if pkl =='parsed_data/2024-04-23_10-46-11.pkl':
         with open(pkl, 'rb') as handle:
@@ -434,9 +444,21 @@ if __name__ == '__main__':
         config.update({'sampling_frequencies': df['info']['sampling_frequencies']})
         record = pkl.split('/')[1].split('.')[0]
     
+        # line = df['info']['line']
+        # driver = df['info']['driver']
+   
         process(df['gaze'], df['mapped_gaze'], df['reference_image'],
                 df['ecg'], df['eda'], config, record)
-       
+        print(record)
+    #     dict_line.update({record: line})
+    #     dict_agent.update({record: driver})
+        
+    # with open("output/info/line.pkl", "wb") as f:
+    #     pickle.dump(dict_line, f) 
+    # with open("output/info/driver.pkl", "wb") as f:
+    #     pickle.dump(dict_agent, f)
+ 
+        
         
         
         

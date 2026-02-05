@@ -57,7 +57,7 @@ class DataParser():
         self.size_plan_x = 1600
         self.size_plan_y = 1200
         
-        self.match_threshold = 10
+        self.match_threshold = 50
         self.output_mapping_x = 600
         self.output_mapping_y = 450
         self.tolerance = 0
@@ -108,8 +108,9 @@ class DataParser():
         
         
         st_ = mapped_gaze['number_point_matches'].to_numpy()
-        stt_ = st_>50
-        print(np.sum(stt_)/len(stt_))
+        stt_ = st_>self.match_threshold
+        mapped_prop = np.sum(stt_)/len(stt_)
+        print('Mapped proportion: {p_}'.format(p_=mapped_prop))
         
         plt.figure()
         plt.hist(st_, bins=30)  # tu peux changer le nombre de bins
