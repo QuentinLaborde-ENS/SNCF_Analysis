@@ -12,8 +12,14 @@ from processing_analysis.symbolization import process as sy_process
 from processing_analysis.symbolization_metrics import process as sm_process
 from processing_analysis.symbolization_metrics import plot_dist_mat
 from processing_analysis.distance import process as di_process
-from processing_analysis.distance_metrics import process as dm_process
-from processing_analysis.distance_metrics import process_figures
+from processing_analysis.distance_geometry_driver_consistency import process as gd_process
+from processing_analysis.distance_geometry_driver_consistency import process_figures as gd_process_figures
+from processing_analysis.distance_stability_robustness import process as sr_process
+from processing_analysis.distance_stability_robustness import process_figure as sr_process_figure
+from processing_analysis.distance_redundancy import process as rd_process
+from processing_analysis.distance_redundancy import process_figures as rd_process_figures
+
+
 
 def feature_extraction():
  
@@ -86,10 +92,23 @@ def compute_distance():
     di_process(config, path, symb_results)
     
     
-def compute_distance_metrics():
-    
-    dm_process()
+def compute_distance_geometry_driver_consistency():
+     
+    gd_process()
+    gd_process_figures()
 
+
+def compute_distance_stability_robustness():
+    
+    sr_process()
+    sr_process_figure()
+    
+    
+def compute_distance_redundancy():
+    
+    rd_process()
+    
+    
 
 if __name__ == '__main__':
     
@@ -113,8 +132,21 @@ if __name__ == '__main__':
         compute_distance()
         
     if True:
-        #compute_distance_metrics()
-        process_figures()
+        compute_distance_geometry_driver_consistency()
+        
+        
+        
+        
+        
+        
+    if False:
+        compute_distance_stability_robustness()
+        
+    if False:
+        compute_distance_redundancy()
+        
+       
+        
         
         
         

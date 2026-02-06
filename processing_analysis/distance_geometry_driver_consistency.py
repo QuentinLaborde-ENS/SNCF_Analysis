@@ -72,52 +72,7 @@ def driver_intra_inter_stats(D, labels):
     out["n_inter_pairs"] = int(inter.size)
     return out
 
-
-def silhouette_from_distance(D, labels):
-    """
-    Silhouette-like score computed directly from a distance matrix (no embedding).
-    For each sample i:
-      a(i) = mean distance to points in same cluster (driver)
-      b(i) = min over other clusters of mean distance to that cluster
-      s(i) = (b(i) - a(i)) / max(a(i), b(i))
-    Returns average over i where defined.
-    """
-    labels = np.asarray(labels)
-    N = D.shape[0]
-    unique = np.unique(labels)
-
-    # precompute indices per cluster
-    idx = {lab: np.where(labels == lab)[0] for lab in unique}
-
-    s_vals = []
-    for i in range(N):
-        li = labels[i]
-        same_idx = idx[li]
-        same_idx = same_idx[same_idx != i]
-
-        if same_idx.size == 0:
-            # silhouette undefined for singleton cluster
-            continue
-
-        a = float(np.mean(D[i, same_idx]))
-
-        b = np.inf
-        for lab in unique:
-            if lab == li:
-                continue
-            other = idx[lab]
-            if other.size == 0:
-                continue
-            b = min(b, float(np.mean(D[i, other])))
-
-        if not np.isfinite(b):
-            continue
-
-        s = (b - a) / (max(a, b) + 1e-12)
-        s_vals.append(s)
-
-    return float(np.mean(s_vals)) if s_vals else float("nan")
-
+ 
 
 def process():
     dist_path = "output/distance/fused.pkl"
@@ -148,54 +103,33 @@ def process():
     for m in modalities:
         D = np.asarray(dist_dict[m], dtype=float)
         met = basic_matrix_metrics(D)
-        met.update(driver_intra_inter_stats(D, labels))
-        met["silhouette_driver"] = silhouette_from_distance(D, labels)
+        met.update(driver_intra_inter_stats(D, labels)) 
         met["matrix"] = m
         rows.append(met)
 
     met_f = basic_matrix_metrics(fused)
-    met_f.update(driver_intra_inter_stats(fused, labels))
-    met_f["silhouette_driver"] = silhouette_from_distance(fused, labels)
+    met_f.update(driver_intra_inter_stats(fused, labels)) 
     met_f["matrix"] = "FUSED"
     rows.append(met_f)
 
     df = pd.DataFrame(rows).sort_values("matrix")
     os.makedirs("output/distance", exist_ok=True)
     df.to_csv("output/distance/recording_distance_metrics.csv", index=False)
-
-    # --- Inter-modality correlations (recording-level) ---
-    corr_rows = []
-    for i in range(len(modalities)):
-        for j in range(i + 1, len(modalities)):
-            m1, m2 = modalities[i], modalities[j]
-            D1, D2 = dist_dict[m1], dist_dict[m2]
-            corr_rows.append({
-                "m1": m1,
-                "m2": m2,
-                "pearson": inter_modality_corr(D1, D2, "pearson"),
-                "spearman": inter_modality_corr(D1, D2, "spearman"),
-            })
-    corr_df = pd.DataFrame(corr_rows).sort_values("pearson", ascending=False)
-    corr_df.to_csv("output/distance/intermodality_correlations.csv", index=False)
-
+ 
     # --- Print a compact view ---
     show_cols = [
         "matrix", "N",
         "mean_offdiag", "std_offdiag",
-        "intra_mean", "inter_mean", "sep_ratio",
-        "silhouette_driver"
+        "intra_mean", "inter_mean", "sep_ratio", 
     ]
     print("\n=== Recording-level metrics ===")
     print(df[show_cols].to_string(index=False))
-
-    print("\n=== Inter-modality correlations (recording-level) ===")
-    print(corr_df.to_string(index=False))
-
+ 
     print("\nSaved:\n- output/distance/recording_distance_metrics.csv\n- output/distance/intermodality_correlations.csv")
 
 
  
-
+##############################################################################
 
 # -----------------------
 # Utils
@@ -291,7 +225,7 @@ def process_figures():
     all_vals = np.concatenate(all_vals)
     vmin, vmax = float(np.min(all_vals)), float(np.max(all_vals))
 
-    # --- 1) FUSED heatmap (sorted by driver) ---
+    # FUSED heatmap (sorted by driver) ---
     plot_heatmap(
         Fr,
         title="Fused recording-level distance matrix (sorted by driver)", 
@@ -302,7 +236,7 @@ def process_figures():
         separator_lw=1.0
     )
 
-    # --- 2) A 2x3 grid of modality heatmaps (sorted by driver) ---
+    # A 2x3 grid of modality heatmaps (sorted by driver) ---
     fig, axes = plt.subplots(
         2, 3, figsize=(14, 9),
         gridspec_kw={"hspace": 0.35, "wspace": 0.15}
@@ -331,38 +265,8 @@ def process_figures():
     grid_png = os.path.join(out_dir, "modalities_heatmaps_by_driver.png") 
     plt.savefig(grid_png, dpi=300, bbox_inches="tight")
     plt.close(fig)
-
-    # --- 3) Correlation heatmap between modalities (from CSV) ---
-    corr_csv = "output/distance/intermodality_correlations.csv"
-    corr_df = pd.read_csv(corr_csv)
-
-    # build symmetric matrix
-    mods = modalities
-    C = np.eye(len(mods), dtype=float)
-    idx = {m:i for i, m in enumerate(mods)}
-    for _, row in corr_df.iterrows():
-        i, j = idx[row["m1"]], idx[row["m2"]]
-        C[i, j] = C[j, i] = float(row["pearson"])
-
-    fig, ax = plt.subplots(figsize=(9, 8))
-    im = ax.imshow(C, cmap="viridis", vmin=0.0, vmax=1.0)
-    ax.set_title("Inter-modality correlations (Pearson) on recording-level distances",
-                 fontsize=14, pad=12, fontweight="bold")
-
-    ax.set_xticks(range(len(mods)))
-    ax.set_yticks(range(len(mods)))
-    ax.set_xticklabels(mods, rotation=45, ha="right", fontsize=10)
-    ax.set_yticklabels(mods, fontsize=10)
-
-    cbar = fig.colorbar(im, ax=ax, fraction=0.04, pad=0.03)
-    cbar.ax.tick_params(labelsize=10)
-
-    plt.tight_layout() 
-    corr_png = os.path.join(out_dir, "intermodality_correlation_heatmap.png") 
-    plt.savefig(corr_png, dpi=300, bbox_inches="tight")
-    plt.close(fig)
-
-    # --- 4) Barplot: sep_ratio per modality (plus FUSED) ---
+ 
+    # Barplot: sep_ratio per modality (plus FUSED) ---
     met_csv = "output/distance/recording_distance_metrics.csv"
     met_df = pd.read_csv(met_csv)
 
