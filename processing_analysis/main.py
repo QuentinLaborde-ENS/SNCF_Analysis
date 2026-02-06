@@ -11,6 +11,9 @@ from processing_analysis.segmentation import process as se_process
 from processing_analysis.symbolization import process as sy_process
 from processing_analysis.symbolization_metrics import process as sm_process
 from processing_analysis.symbolization_metrics import plot_dist_mat
+from processing_analysis.distance import process as di_process
+from processing_analysis.distance_metrics import process as dm_process
+from processing_analysis.distance_metrics import process_figures
 
 def feature_extraction():
  
@@ -72,6 +75,20 @@ def symbolization_metrics():
     plot_dist_mat()
     
 
+def compute_distance():
+    
+    with open('configurations/analysis.yaml', 'r') as file:
+        config = yaml.safe_load(file)
+        
+    path = 'output/symbolization/'
+    symb_results = [f for f in os.listdir(path) if f[-4:] == '.pkl']
+   
+    di_process(config, path, symb_results)
+    
+    
+def compute_distance_metrics():
+    
+    dm_process()
 
 
 if __name__ == '__main__':
@@ -89,8 +106,15 @@ if __name__ == '__main__':
     if False:
         symbolization()
         
-    if True:
+    if False:
         symbolization_metrics()
+        
+    if False:
+        compute_distance()
+        
+    if True:
+        #compute_distance_metrics()
+        process_figures()
         
         
         

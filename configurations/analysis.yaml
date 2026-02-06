@@ -61,13 +61,6 @@ symbolization:
         ecg: 20
         eda: 20
        
-clustering: 
-    edit_distance:
-        deletion_cost: !!float 1
-        insertion_cost: !!float 1
-        normalization: max
-   
-  
  
     
     
