@@ -14,8 +14,7 @@ from processing_analysis.symbolization_metrics import plot_dist_mat
 from processing_analysis.distance import process as di_process
 from processing_analysis.distance_geometry_driver_consistency import process as gd_process
 from processing_analysis.distance_geometry_driver_consistency import process_figures as gd_process_figures
-from processing_analysis.distance_stability_robustness import process as sr_process
-from processing_analysis.distance_stability_robustness import process_figure as sr_process_figure
+from processing_analysis.distance_stability_robustness import process as sr_process 
 from processing_analysis.distance_redundancy import process as rd_process
 from processing_analysis.distance_redundancy import process_figures as rd_process_figures
 
