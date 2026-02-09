@@ -21,12 +21,12 @@ def offdiag_values(D: np.ndarray) -> np.ndarray:
     return D[iu]
 
 
-def shannon_entropy_from_hist(x: np.ndarray, bins: int = 50, eps: float = 1e-12) -> float:
-    """Shannon entropy of histogram-based discrete distribution."""
-    hist, _ = np.histogram(x, bins=bins, density=True)
-    p = hist / (hist.sum() + eps)
+def shannon_entropy_from_hist(x, bins=50, eps=1e-12):
+    counts, _ = np.histogram(x, bins=bins, density=False)
+    p = counts / (counts.sum() + eps)
     p = p[p > 0]
     return float(-(p * np.log(p + eps)).sum())
+
 
 
 def mds_stress(D: np.ndarray, n_components: int = 2, random_state: int = 0) -> float:

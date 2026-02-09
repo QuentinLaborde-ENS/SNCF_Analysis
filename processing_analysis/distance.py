@@ -62,7 +62,10 @@ def process(config, path, symbolization_results):
                 s_1 = record_dict[records[i]]
                 s_2 = record_dict[records[j]]
                 dist_mat[i, j] = dist_mat[j, i] = editDistance(s_1, s_2, d_m)
-
+        tri = dist_mat[np.triu_indices(len(records), 1)]
+        med = np.median(tri)
+        if med > 0:
+            dist_mat /= med
         dist_dict[type_] = dist_mat
 
     # Fused RMS distance

@@ -91,11 +91,74 @@ def process(
     
  
 
+ 
+
+def plot_heatmap(
+    D,
+    title,
+    out_png,
+    cmap="viridis",
+    vmin=None,
+    vmax=None,
+    show_separators=None,
+    separator_lw=1.0,
+    annotate=False,
+    annotate_fmt="{:.2f}",
+    annotate_fontsize=15,
+    annotate_color="white",
+):
+    fig, ax = plt.subplots(figsize=(8.5, 7.5))
+
+    # --- Make sure no background grid is shown ---
+    ax.grid(False)
+    ax.set_axisbelow(False)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    im = ax.imshow(D, cmap=cmap, vmin=vmin, vmax=vmax)
+
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    if show_separators:
+        for k in show_separators:
+            ax.axhline(k - 0.5, linewidth=separator_lw)
+            ax.axvline(k - 0.5, linewidth=separator_lw)
+
+    # --- Add numbers inside cells (optional) ---
+    if annotate:
+        D = np.asarray(D, float)
+        n = D.shape[0]
+        for i in range(n):
+            for j in range(n):
+                ax.text(
+                    j, i,
+                    annotate_fmt.format(D[i, j]),
+                    ha="center", va="center",
+                    fontsize=annotate_fontsize,
+                    color=annotate_color,
+                )
+
+    cbar = fig.colorbar(im, ax=ax, fraction=0.04, pad=0.03)
+    cbar.ax.tick_params(labelsize=11)
+    # --- Remove vertical "Correlation" label ---
+    cbar.set_label("")  # or comment this line out entirely
+
+    plt.grid(False)
+    plt.tight_layout()
+    plt.savefig(out_png, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+
 def process_figures(
     csv_dir="output/distance",
     out_dir="output/distance",
     use_spearman=False,
-    dpi=200,
+    dpi=300,
+    modality_order=None,
+    add_family_separators=True,
+    annotate_cells=True,
+    annotate_fmt="{:.2f}",
 ):
     os.makedirs(out_dir, exist_ok=True)
 
@@ -107,41 +170,134 @@ def process_figures(
     )
     corr = pd.read_csv(os.path.join(csv_dir, fname), index_col=0)
 
-    labels = list(corr.index)
+    # --- Enforce an order consistent with the rest of the chapter ---
+    if modality_order is None:
+        modality_order = [
+            "oculomotorFixation",
+            "oculomotorSaccade",
+            "scanpath",
+            "AoI",
+            "ecg",
+            "eda",
+            "FUSED",
+        ]
+
+    # Keep only available modalities, and append any unexpected ones at the end
+    modality_order = [m for m in modality_order if m in corr.index]
+    for m in corr.index:
+        if m not in modality_order:
+            modality_order.append(m)
+
+    corr = corr.loc[modality_order, modality_order]
     C = corr.values.astype(float)
 
-    # --- Heatmap ---
-    plt.figure(figsize=(7.5, 6.5))
-    im = plt.imshow(C, vmin=-1, vmax=1, cmap="viridis")
-    plt.xticks(range(len(labels)), labels, rotation=35, ha="right", fontsize=12)
-    plt.yticks(range(len(labels)), labels, fontsize=12)
-    cbar = plt.colorbar(im, fraction=0.046, pad=0.04)
-    cbar.set_label("Correlation")
+    # --- Optional separators to mimic the "block" reading style ---
+    sep_idx = None
+    if add_family_separators:
+        groups = [
+            ["oculomotorFixation", "oculomotorSaccade"],  # eye micro
+            ["scanpath", "AoI"],                          # spatial
+            ["ecg", "eda"],                               # physio
+            ["FUSED"],                                    # fused
+        ]
+        boundaries = []
+        k = 0
+        for g in groups:
+            present = [x for x in g if x in modality_order]
+            if not present:
+                continue
+            k += len(present)
+            if k < len(modality_order):
+                boundaries.append(k)
+        sep_idx = boundaries if boundaries else None
 
-    title = "Inter-modality correlation (Spearman)" if use_spearman else "Inter-modality correlation (Pearson)"
-    plt.title(title)
+    title = "Inter-modality correlation matrix (Spearman)" if use_spearman else "Inter-modality correlation matrix (Pearson)"
+
+    # --- 1) Paper-style heatmap (same style as distance matrices: no ticks) ---
+    out_png = os.path.join(
+        out_dir,
+        "intermodality_corr_heatmap_spearman.png" if use_spearman else "intermodality_corr_heatmap_pearson.png"
+    )
+
+    plot_heatmap(
+        C,
+        title=title,
+        out_png=out_png,
+        cmap="viridis",
+        vmin=-1.0,
+        vmax=1.0,
+        show_separators=sep_idx,
+        separator_lw=1.0,
+        annotate=annotate_cells,
+        annotate_fmt=annotate_fmt,
+        annotate_fontsize=20,
+        annotate_color="white",
+    )
+
+    # --- 2) Reader-friendly heatmap with labels (recommended) ---
+    out_png_labeled = os.path.join(
+        out_dir,
+        "intermodality_corr_heatmap_spearman_labeled.png" if use_spearman else "intermodality_corr_heatmap_pearson_labeled.png"
+    )
+
+    label_map = {
+        "oculomotorFixation": "Fixations",
+        "oculomotorSaccade": "Saccades",
+        "scanpath": "Scanpaths",
+        "AoI": "AoIs",
+        "ecg": "ECG",
+        "eda": "EDA",
+        "FUSED": "FUSED",
+    }
+    labels_pretty = [label_map.get(m, m) for m in modality_order]
+
+    fig, ax = plt.subplots(figsize=(8.5, 7.5))
+
+    # remove background grid/spines explicitly
+    ax.grid(False)
+    ax.set_axisbelow(False)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    im = ax.imshow(C, cmap="viridis", vmin=-1.0, vmax=1.0)
+
+    ax.set_xticks(range(len(labels_pretty)))
+    ax.set_yticks(range(len(labels_pretty)))
+    ax.set_xticklabels(labels_pretty, rotation=30, ha="right", fontsize=16)
+    ax.set_yticklabels(labels_pretty, fontsize=16)
+
+    if sep_idx:
+        for k in sep_idx:
+            ax.axhline(k - 0.5, linewidth=1.0)
+            ax.axvline(k - 0.5, linewidth=1.0)
+
+    # annotate values
+    if annotate_cells:
+        n = C.shape[0]
+        for i in range(n):
+            for j in range(n):
+                ax.text(
+                    j, i,
+                    annotate_fmt.format(C[i, j]),
+                    ha="center", va="center",
+                    fontsize=10,
+                    color="black",
+                )
+
+    cbar = fig.colorbar(im, ax=ax, fraction=0.04, pad=0.03)
+    cbar.ax.tick_params(labelsize=11)
+    # --- Remove vertical "Correlation" label ---
+    cbar.set_label("")
+
+    
+    plt.grid(False)
     plt.tight_layout()
-
-    heatmap_path = os.path.join(out_dir, "intermodality_corr_heatmap.png")
-    plt.savefig(heatmap_path, dpi=dpi)
-    plt.close()
-
-    # --- Dendrogram ---
-    D = 1.0 - C
-    np.fill_diagonal(D, 0.0)
-    Z = linkage(squareform(D, checks=False), method="average")
-
-    plt.figure(figsize=(8.5, 4.8))
-    dendrogram(Z, labels=labels, leaf_rotation=30)
-    plt.ylabel("Distance (1 − correlation)")
-    plt.title("Modality clustering based on distance geometry")
-    plt.tight_layout()
-
-    dendro_path = os.path.join(out_dir, "intermodality_dendrogram.png")
-    plt.savefig(dendro_path, dpi=dpi)
-    plt.close()
+    plt.savefig(out_png_labeled, dpi=dpi, bbox_inches="tight")
+    plt.close(fig)
 
     print("Saved figures:")
-    print(f"- {heatmap_path}")
-    print(f"- {dendro_path}")
+    print(f"- {out_png}")
+    print(f"- {out_png_labeled}")
+
+
 

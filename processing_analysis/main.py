@@ -9,6 +9,8 @@ from processing_analysis.feature_extraction import process as fe_process
 from processing_analysis.feature_normalization import process as fn_process
 from processing_analysis.segmentation import process as se_process
 from processing_analysis.symbolization import process as sy_process
+from processing_analysis.symbolization import generate_all_multimodal_scarfplots
+from processing_analysis.symbolization import process_symbol_dictionary_figures
 from processing_analysis.symbolization_metrics import process as sm_process
 from processing_analysis.symbolization_metrics import plot_dist_mat
 from processing_analysis.distance import process as di_process
@@ -73,10 +75,12 @@ def symbolization():
 
     sy_process(config, path, feature_records)
     
+    process_symbol_dictionary_figures()
+    #generate_all_multimodal_scarfplots()
     
 def symbolization_metrics():
     
-    #sm_process()
+    sm_process()
     plot_dist_mat()
     
 
@@ -100,13 +104,13 @@ def compute_distance_geometry_driver_consistency():
 def compute_distance_stability_robustness():
     
     sr_process()
-    sr_process_figure()
+    
     
     
 def compute_distance_redundancy():
     
     rd_process()
-    
+    rd_process_figures()
     
 
 if __name__ == '__main__':
@@ -130,18 +134,13 @@ if __name__ == '__main__':
     if False:
         compute_distance()
         
-    if True:
+    if False:
         compute_distance_geometry_driver_consistency()
-        
-        
-        
-        
-        
         
     if False:
         compute_distance_stability_robustness()
         
-    if False:
+    if True:
         compute_distance_redundancy()
         
        
