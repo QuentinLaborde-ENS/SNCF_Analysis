@@ -19,7 +19,7 @@ from processing_analysis.distance_geometry_driver_consistency import process_fig
 from processing_analysis.distance_stability_robustness import process as sr_process 
 from processing_analysis.distance_redundancy import process as rd_process
 from processing_analysis.distance_redundancy import process_figures as rd_process_figures
-
+from processing_analysis.interpretation import process as in_process
 
 
 def feature_extraction():
@@ -106,11 +106,23 @@ def compute_distance_stability_robustness():
     sr_process()
     
     
-    
 def compute_distance_redundancy():
     
     rd_process()
     rd_process_figures()
+    
+    
+def compute_interpretation():
+    
+    with open('configurations/analysis.yaml', 'r') as file:
+        config = yaml.safe_load(file)
+         
+    path = 'output/features/'
+    feature_records = [f for f in os.listdir(path) if f[-4:] == '.csv']
+    
+    in_process(feature_records, config)
+    
+    
     
 
 if __name__ == '__main__':
@@ -140,8 +152,11 @@ if __name__ == '__main__':
     if False:
         compute_distance_stability_robustness()
         
-    if True:
+    if False:
         compute_distance_redundancy()
+        
+    if True:
+        compute_interpretation()
         
        
         
