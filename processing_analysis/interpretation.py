@@ -9,10 +9,30 @@ import pandas as pd
 
 def process(feature_records, config):
  
-    if True: 
+    if False: 
         process_subset(config, 
                        feature_records, 
                        'oculomotorFixation')
+    if True: 
+        process_subset(config, 
+                       feature_records, 
+                       'oculomotorSaccade')
+    if False: 
+        process_subset(config, 
+                       feature_records, 
+                       'scanpath')
+    if False: 
+        process_subset(config, 
+                       feature_records, 
+                       'AoI')
+    if False: 
+        process_subset(config, 
+                       feature_records, 
+                       'ecg')
+    if False: 
+        process_subset(config, 
+                       feature_records, 
+                       'eda')
         
         
 def process_subset(config, 
@@ -75,6 +95,7 @@ def process_subset(config,
     elif type_=='oculomotorSaccade':
         n_centers = config['symbolization']['nb_clusters']['oculomotor'] 
         feature_records = [f for f in feature_records if f.endswith("oculomotor.csv")]
+        features = config['data']['oculomotor_features']
         features = [feature for feature in features if feature[:3]=='sac']
         
         symb_file = [f for f in symbolization_results if f.split('.')[0] == 'oculomotorSaccade'][0]
@@ -93,6 +114,11 @@ def process_subset(config,
         bkpt_name = '{name_}_{type_}.npy'.format(name_=name, 
                                                   type_=type_)
         bkpts = np.load(bkpt_path+bkpt_name) 
+        
+        
+        if name=='2023-10-26_13-40-27':
+            print(symb_l)
+            print(bkpts*config['general']['oculomotor_partition_length']/60)
         
         for i in range(0, len(bkpts)-1):
             l_data = df[bkpts[i]: bkpts[i+1]] 
