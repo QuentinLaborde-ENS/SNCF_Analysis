@@ -4,7 +4,8 @@ import os
 import pickle
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt 
+from matplotlib.patches import FancyArrowPatch
 
 import seaborn as sns
 
@@ -289,25 +290,29 @@ def driver_change_indices(drivers_sorted: np.ndarray):
             changes.append(i)
     return changes
 
+ 
 
 def plot_heatmap(D, title, out_png, cmap="viridis", vmin=None, vmax=None,
                  show_separators=None, separator_lw=1.0):
+
     fig, ax = plt.subplots(figsize=(8.5, 7.5))
     im = ax.imshow(D, cmap=cmap, vmin=vmin, vmax=vmax)
- 
+
     ax.set_xticks([])
     ax.set_yticks([])
 
     if show_separators:
         for k in show_separators:
-            ax.axhline(k - 0.5, linewidth=separator_lw)
-            ax.axvline(k - 0.5, linewidth=separator_lw)
+            ax.axhline(k - 0.5, linewidth=separator_lw, color='black')
+            ax.axvline(k - 0.5, linewidth=separator_lw, color='black')
+
+
 
     cbar = fig.colorbar(im, ax=ax, fraction=0.04, pad=0.03)
-    cbar.ax.tick_params(labelsize=11)
+    cbar.ax.tick_params(labelsize=18)
 
     plt.tight_layout()
-    plt.savefig(out_png, dpi=300, bbox_inches="tight")
+    plt.savefig(out_png, dpi=300, bbox_inches="tight", pad_inches=0.15)
     plt.close(fig)
 
 
@@ -351,12 +356,12 @@ def process_figures():
     # Note: you asked to remove the TGV/Transilien annotation => no sidebars/legend.
     plot_heatmap(
         Fr,
-        title="Fused recording-level distance matrix (sorted by driver)",
+        title="Fused",
         out_png=os.path.join(out_dir, "fused_heatmap_by_driver.png"),
         cmap="viridis",
         vmin=vmin, vmax=vmax,
         show_separators=sep_idx,
-        separator_lw=1.0
+        separator_lw=3.0
     )
 
     # --- 6 individual modality heatmaps (sorted by driver) ---
@@ -370,7 +375,7 @@ def process_figures():
             cmap="viridis",
             vmin=vmin, vmax=vmax,
             show_separators=sep_idx,
-            separator_lw=1.0
+            separator_lw=3.0
         )
 
     # --- Barplot: separation ratios (driver vs within-line vs line) ---

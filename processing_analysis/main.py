@@ -146,7 +146,7 @@ if __name__ == '__main__':
     if False:
         compute_distance()
         
-    if False:
+    if True:
         compute_distance_geometry_driver_consistency()
         
     if False:
